@@ -1,0 +1,35 @@
+@model IEnumerable<BrandListViewModel>
+@{
+    ViewData["Title"] = "Brands";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Brands</h1>
+    <a asp-action="Create" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition text-sm">+ Add</a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-3 text-left">Name</th>
+                <th class="px-4 py-3 text-left">Country of Origin</th>
+                <th class="px-4 py-3 text-left">Models</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            @foreach (var brand in Model)
+            {
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 font-medium">@brand.Name</td>
+                    <td class="px-4 py-3 text-gray-500">@(brand.CountryOfOrigin ?? "–")</td>
+                    <td class="px-4 py-3 text-gray-500">@brand.ModelsCount</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (!Model.Any())
+    {
+        <p class="text-center text-gray-400 py-8">No brands registered.</p>
+    }
+</div>

@@ -1,0 +1,52 @@
+@model IEnumerable<CarListViewModel>
+@{
+    ViewData["Title"] = "Cars";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Cars</h1>
+    <a asp-action="Create" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition text-sm">+ Add</a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-3 text-left">License Plate</th>
+                <th class="px-4 py-3 text-left">Brand</th>
+                <th class="px-4 py-3 text-left">Model</th>
+                <th class="px-4 py-3 text-left">Year</th>
+                <th class="px-4 py-3 text-left">Rate / day</th>
+                <th class="px-4 py-3 text-left">Fuel</th>
+                <th class="px-4 py-3 text-left">Seats</th>
+                <th class="px-4 py-3"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            @foreach (var car in Model)
+            {
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 font-mono font-medium">@car.LicensePlate</td>
+                    <td class="px-4 py-3">@car.BrandName</td>
+                    <td class="px-4 py-3">@car.ModelName</td>
+                    <td class="px-4 py-3 text-gray-500">@car.Year</td>
+                    <td class="px-4 py-3">@car.DailyRate.ToString("0.00") €</td>
+                    <td class="px-4 py-3 text-gray-500">@car.FuelType</td>
+                    <td class="px-4 py-3 text-gray-500">@car.SeatsCount</td>
+                    <td class="px-4 py-3 text-right space-x-2">
+                        <a asp-action="Detail" asp-route-id="@car.Id" class="text-indigo-600 hover:underline">Detail</a>
+                        <a asp-action="Edit" asp-route-id="@car.Id" class="text-amber-600 hover:underline">Edit</a>
+                        <form asp-action="Delete" asp-route-id="@car.Id" method="post" class="inline" onsubmit="return confirm('Delete this car?')">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="text-red-500 hover:underline">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (!Model.Any())
+    {
+        <p class="text-center text-gray-400 py-8">No cars registered.</p>
+    }
+</div>

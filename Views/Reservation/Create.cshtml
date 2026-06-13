@@ -1,0 +1,52 @@
+@model ReservationCreateViewModel
+@{
+    ViewData["Title"] = "New Reservation";
+}
+
+<div class="max-w-lg">
+    <h1 class="text-2xl font-bold mb-6">New Reservation</h1>
+
+    <form asp-action="Create" method="post" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+        @Html.AntiForgeryToken()
+
+        <div asp-validation-summary="ModelOnly" class="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg p-3"></div>
+
+        <div>
+            <label asp-for="ClientId" class="block text-sm font-medium text-gray-700 mb-1"></label>
+            <select asp-for="ClientId" asp-items="Model.Clients" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value="">-- Select a client --</option>
+            </select>
+            <span asp-validation-for="ClientId" class="text-red-500 text-xs"></span>
+        </div>
+
+        <div>
+            <label asp-for="CarId" class="block text-sm font-medium text-gray-700 mb-1"></label>
+            <select asp-for="CarId" asp-items="Model.Cars" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value="">-- Select a car --</option>
+            </select>
+            <span asp-validation-for="CarId" class="text-red-500 text-xs"></span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label asp-for="StartDate" class="block text-sm font-medium text-gray-700 mb-1"></label>
+                <input asp-for="StartDate" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                <span asp-validation-for="StartDate" class="text-red-500 text-xs"></span>
+            </div>
+            <div>
+                <label asp-for="EndDate" class="block text-sm font-medium text-gray-700 mb-1"></label>
+                <input asp-for="EndDate" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                <span asp-validation-for="EndDate" class="text-red-500 text-xs"></span>
+            </div>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+            <button type="submit" class="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition text-sm">Book</button>
+            <a asp-action="Index" class="text-gray-500 px-4 py-2 rounded-lg hover:bg-gray-100 transition text-sm">Cancel</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

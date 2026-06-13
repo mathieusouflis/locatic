@@ -1,0 +1,39 @@
+@model IEnumerable<ReservationListViewModel>
+@{
+    ViewData["Title"] = "Reservations";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Reservations</h1>
+    <a asp-action="Create" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition text-sm">+ New Reservation</a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-3 text-left">Client</th>
+                <th class="px-4 py-3 text-left">Car</th>
+                <th class="px-4 py-3 text-left">Start</th>
+                <th class="px-4 py-3 text-left">End</th>
+                <th class="px-4 py-3 text-left">Duration</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            @foreach (var r in Model)
+            {
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 font-medium">@r.ClientFullName</td>
+                    <td class="px-4 py-3 text-gray-600">@r.CarLabel</td>
+                    <td class="px-4 py-3 text-gray-500">@r.StartDate.ToString("MM/dd/yyyy")</td>
+                    <td class="px-4 py-3 text-gray-500">@r.EndDate.ToString("MM/dd/yyyy")</td>
+                    <td class="px-4 py-3 text-gray-500">@r.DurationDays d</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (!Model.Any())
+    {
+        <p class="text-center text-gray-400 py-8">No reservations registered.</p>
+    }
+</div>

@@ -1,0 +1,33 @@
+@model BrandCreateViewModel
+@{
+    ViewData["Title"] = "New Brand";
+}
+
+<div class="max-w-lg">
+    <h1 class="text-2xl font-bold mb-6">New Brand</h1>
+
+    <form asp-action="Create" method="post" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+        @Html.AntiForgeryToken()
+
+        <div>
+            <label asp-for="Name" class="block text-sm font-medium text-gray-700 mb-1"></label>
+            <input asp-for="Name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            <span asp-validation-for="Name" class="text-red-500 text-xs"></span>
+        </div>
+
+        <div>
+            <label asp-for="CountryOfOrigin" class="block text-sm font-medium text-gray-700 mb-1"></label>
+            <input asp-for="CountryOfOrigin" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            <span asp-validation-for="CountryOfOrigin" class="text-red-500 text-xs"></span>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+            <button type="submit" class="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition text-sm">Save</button>
+            <a asp-action="Index" class="text-gray-500 px-4 py-2 rounded-lg hover:bg-gray-100 transition text-sm">Cancel</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

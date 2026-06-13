@@ -1,0 +1,43 @@
+@model CarDetailViewModel
+@{
+    ViewData["Title"] = Model.LicensePlate;
+}
+
+<div class="max-w-lg">
+    <div class="flex items-center gap-3 mb-6">
+        <a asp-action="Index" class="text-gray-400 hover:text-gray-600">← Cars</a>
+        <h1 class="text-2xl font-bold">@Model.LicensePlate</h1>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-3 text-sm">
+        <div class="flex justify-between">
+            <span class="text-gray-500">Brand</span>
+            <span class="font-medium">@Model.BrandName</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-500">Model</span>
+            <span class="font-medium">@Model.ModelName</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-500">Year</span>
+            <span>@Model.Year</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-500">Daily Rate</span>
+            <span>@Model.DailyRate.ToString("0.00") €</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-500">Fuel Type</span>
+            <span>@Model.FuelType</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-500">Seats</span>
+            <span>@Model.SeatsCount</span>
+        </div>
+    </div>
+
+    <div class="flex gap-3 mt-4">
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition text-sm">Edit</a>
+        <a asp-action="Index" class="text-gray-500 px-4 py-2 rounded-lg hover:bg-gray-100 transition text-sm">Back</a>
+    </div>
+</div>
