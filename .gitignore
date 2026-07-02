@@ -35,6 +35,8 @@ coverage/
 *.lcov
 htmlcov/
 .pytest_cache/
+TestResults/
+*.trx
 
 # ── IDE & OS ─────────────────────────────────────────────
 .DS_Store

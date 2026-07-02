@@ -32,4 +32,4 @@ jobs:
       - name: Check EF migrations are up to date
         run: |
           dotnet tool install --global dotnet-ef
-          dotnet ef migrations list
+          dotnet ef migrations list --project app/locatic

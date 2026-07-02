@@ -7,9 +7,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 
+// DB_PATH permet de pointer la base SQLite vers un volume monté (Docker / Kubernetes).
+var dbPath = builder.Configuration["DB_PATH"];
+var connectionString = !string.IsNullOrWhiteSpace(dbPath)
+    ? $"Data Source={dbPath}"
+    : builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=locatic.db";
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? "Data Source=locatic.db"));
+    options.UseSqlite(connectionString));
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database");
 
 builder.Services.AddScoped<IBrandRepository, BrandRepository>();
 builder.Services.AddScoped<ICarModelRepository, CarModelRepository>();
@@ -31,13 +39,24 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// Derrière Nginx (conteneur), le TLS est terminé par le reverse proxy :
+// la redirection HTTPS casserait les probes Kubernetes.
+if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != "true")
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthorization();
+
+app.MapHealthChecks("/health");
 
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+// Rend la classe Program visible pour les tests d'intégration (WebApplicationFactory).
+public partial class Program { }
