@@ -57,3 +57,7 @@ obj/
 tmp/
 temp/
 .cache/
+
+# ── Tests ────────────────────────────────────────────────
+TestResults/
+*.trx

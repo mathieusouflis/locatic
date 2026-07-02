@@ -29,7 +29,10 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
+      - name: Test
+        run: dotnet test --no-restore --configuration Release --logger "trx;LogFileName=test-results.trx"
+
       - name: Check EF migrations are up to date
         run: |
           dotnet tool install --global dotnet-ef
-          dotnet ef migrations list
+          dotnet ef migrations list --project app/locatic
