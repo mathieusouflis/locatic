@@ -10,6 +10,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
     name: Build & verify
@@ -33,3 +37,15 @@ jobs:
         run: |
           dotnet tool install --global dotnet-ef
           dotnet ef migrations list --project app/locatic
+
+  build-image:
+    name: Build Docker image
+    needs: build
+    uses: ./.github/workflows/reusable-docker.yml
+    with:
+      image-name: ghcr.io/${{ github.repository }}
+      context: ./app
+      push: ${{ github.ref == 'refs/heads/main' }}
+    secrets:
+      registry-username: ${{ github.actor }}
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
