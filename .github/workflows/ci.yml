@@ -112,12 +112,6 @@ jobs:
           format: "table"
 
   # Stage 6 : Deploy staging
-  #
-  # Locatic n'a pas de secret de déploiement à proprement parler : SQLite,
-  # pas de base externe, pas d'API tierce. Contrairement à la référence
-  # (Postgres, DB_PASSWORD/API_KEY), ce job montre plutôt le tag d'image
-  # qui serait déployé et les variables d'environnement réellement lues
-  # par l'application (voir .env.example et app/locatic/Program.cs).
   deploy-staging:
     needs: [build-image, security]
     runs-on: ubuntu-latest
