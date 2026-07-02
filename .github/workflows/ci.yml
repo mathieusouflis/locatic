@@ -112,18 +112,25 @@ jobs:
           format: "table"
 
   # Stage 6 : Deploy staging
+  #
+  # Locatic n'a pas de secret de déploiement à proprement parler : SQLite,
+  # pas de base externe, pas d'API tierce. Contrairement à la référence
+  # (Postgres, DB_PASSWORD/API_KEY), ce job montre plutôt le tag d'image
+  # qui serait déployé et les variables d'environnement réellement lues
+  # par l'application (voir .env.example et app/locatic/Program.cs).
   deploy-staging:
     needs: [build-image, security]
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - name: Use secrets
+      - name: Show deployment configuration
         env:
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          API_KEY: ${{ secrets.API_KEY }}
+          DB_PATH: /data/locatic.db
+          ASPNETCORE_ENVIRONMENT: Production
         run: |
-          echo "Secrets are masked in logs"
-          echo "DB_PASSWORD length: ${#DB_PASSWORD}"
+          echo "Image: ${{ needs.build-image.outputs.image-tag }}"
+          echo "DB_PATH=$DB_PATH"
+          echo "ASPNETCORE_ENVIRONMENT=$ASPNETCORE_ENVIRONMENT"
       - run: echo "Deploying to staging... (placeholder, pas de déploiement réel depuis GitHub)"
 
   # Stage 7 : Deploy production
