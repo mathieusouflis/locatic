@@ -25,95 +25,95 @@ La PR déclenche la CI ; le merge n'est possible que si les checks passent. La p
 
 ## Jobs du pipeline
 
-Fichier : `.github/workflows/ci.yml`. Déclenché sur `pull_request` et sur `push` vers `main`. Organisation cible, avec dépendances explicites (`needs:`) :
+Trois fichiers composent le pipeline :
+
+- `.github/workflows/ci.yml` — l'orchestrateur, déclenché sur `pull_request` et sur `push` vers `main` ;
+- `.github/workflows/reusable-docker.yml` — un **workflow réutilisable** (`workflow_call`) qui construit (et publie sur demande) l'image Docker ;
+- `.github/actions/setup-tools/action.yml` — une **action composite** qui installe et vérifie les outils utilisés par le job de tests (`dotnet-ef`, Docker).
+
+Organisation, avec dépendances explicites (`needs:`) :
 
 ```
-test ──► docker-build ──► scan ──► publish   (publish : uniquement sur main)
+test ──► build (reusable-docker.yml, push conditionné à main) ──► security
 ```
 
 ### 1. `test` — build & tests
-Déjà en place : checkout, setup .NET, `dotnet restore`, `dotnet build --configuration Release`, `dotnet test`, vérification des migrations EF. Si une étape échoue, le pipeline s'arrête : **un pipeline vert doit prouver que l'application fonctionne**, pas seulement qu'elle compile.
-
-### 2. `docker-build` — build de l'image
 
 ```yaml
-docker-build:
-  needs: test
+test:
   runs-on: ubuntu-latest
   steps:
     - uses: actions/checkout@v7
-    - uses: docker/setup-buildx-action@v3
-    - uses: docker/build-push-action@v6
-      with:
-        context: app
-        push: false
-        tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
-        outputs: type=docker,dest=/tmp/image.tar
+    - uses: actions/setup-dotnet@v5
+      with: { dotnet-version: "8.0.x" }
+    - uses: ./.github/actions/setup-tools
+    - run: dotnet restore
+    - run: dotnet build --no-restore --configuration Release
+    - name: Run tests
+      run: |
+        set -o pipefail
+        dotnet test --no-restore --configuration Release \
+          --logger "trx;LogFileName=test-results.trx" 2>&1 | tee test-output.txt
     - uses: actions/upload-artifact@v4
-      with: { name: docker-image, path: /tmp/image.tar }
+      if: always()
+      with:
+        name: test-results
+        path: |
+          test-output.txt
+          **/TestResults/*.trx
+    - run: dotnet ef migrations list --project app/locatic
 ```
 
-L'image est construite **sur toutes les PR** (on valide le Dockerfile avant merge) mais n'est **publiée que sur `main`**.
+`./.github/actions/setup-tools` installe `dotnet-ef` et affiche les versions des outils utilisés (lisibilité des logs). Les résultats de test sont uploadés **même en cas d'échec** (`if: always()`) pour pouvoir diagnostiquer un test cassé sans relancer le job. Si une étape échoue, le pipeline s'arrête : **un pipeline vert doit prouver que l'application fonctionne**, pas seulement qu'elle compile.
 
-### 3. `scan` — sécurité
+### 2. `build` — image Docker via un workflow réutilisable
 
 ```yaml
-scan:
-  needs: docker-build
+build:
+  needs: test
+  uses: ./.github/workflows/reusable-docker.yml
+  with:
+    image-name: ghcr.io/${{ github.repository }}
+    context: ./app
+    push: ${{ github.ref == 'refs/heads/main' }}
+  secrets:
+    registry-username: ${{ github.actor }}
+    registry-password: ${{ secrets.GITHUB_TOKEN }}
+```
+
+`reusable-docker.yml` factorise le build Docker (utilisable par d'autres workflows si besoin) : `docker/metadata-action` calcule les tags (`sha`, nom de branche, `latest` seulement si `push`), `docker/setup-buildx-action` + cache GitHub Actions (`cache-from`/`cache-to: type=gha`) accélèrent les builds successifs, et l'image n'est **poussée sur la registry que si `push: true`** — c'est-à-dire uniquement sur `main`. Sur une PR, l'image est construite (le Dockerfile est validé) mais jamais publiée.
+
+Authentification : `registry-password: ${{ secrets.GITHUB_TOKEN }}` — le token éphémère du workflow, combiné à `permissions: packages: write` déclaré dans `ci.yml`, suffit pour GHCR : **aucun token personnel à créer ni à stocker**.
+
+Vérifier la publication : onglet **Packages** du dépôt, ou `docker pull ghcr.io/<owner>/<repo>:<sha>`.
+
+### 3. `security` — scans
+
+```yaml
+security:
+  needs: build
   runs-on: ubuntu-latest
   steps:
     - uses: actions/checkout@v7
-    - uses: actions/download-artifact@v4
-      with: { name: docker-image, path: /tmp }
-    - run: docker load -i /tmp/image.tar
-    - name: Scan image (Trivy)
-      uses: aquasecurity/trivy-action@master
+    - name: Scan application files (Trivy)
+      uses: aquasecurity/trivy-action@v0.36.0
       with:
-        image-ref: ghcr.io/${{ github.repository }}:${{ github.sha }}
-        severity: CRITICAL,HIGH
-        exit-code: "1"          # échec du pipeline si vulnérabilité critique
-    - name: Scan secrets (Gitleaks)
+        scan-type: 'fs'
+        scan-ref: 'app/'
+        severity: 'HIGH,CRITICAL'
+        exit-code: '1'          # échec du pipeline si vulnérabilité critique
+        format: 'table'
+    - name: Scan for leaked secrets (Gitleaks)
       uses: gitleaks/gitleaks-action@v2
 ```
 
-Deux scans : vulnérabilités de l'image (Trivy) et secrets dans le dépôt (Gitleaks). `exit-code: "1"` rend le scan bloquant.
-
-### 4. `publish` — publication sur GHCR, uniquement sur `main`
-
-```yaml
-publish:
-  needs: scan
-  if: github.ref == 'refs/heads/main'
-  runs-on: ubuntu-latest
-  permissions:
-    contents: read
-    packages: write
-  steps:
-    - uses: actions/checkout@v7
-    - uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    - uses: docker/build-push-action@v6
-      with:
-        context: app
-        push: true
-        tags: |
-          ghcr.io/${{ github.repository }}:${{ github.sha }}
-          ghcr.io/${{ github.repository }}:latest
-```
-
-Points clés :
-- `if: github.ref == 'refs/heads/main'` — les PR construisent mais ne publient pas ;
-- `permissions: packages: write` — le `GITHUB_TOKEN` éphémère du workflow suffit pour GHCR : **aucun token personnel à créer ni à stocker** ;
-- double tag `sha` + `latest` : le déploiement épingle un SHA précis (traçabilité, rollback), `latest` sert de commodité locale.
-
-Vérifier la publication : onglet **Packages** du dépôt, ou `docker pull ghcr.io/<owner>/locatic:<sha>`.
+Deux scans : dépendances/fichiers vulnérables (Trivy, mode `fs` sur `app/`, couvre les packages NuGet) et secrets présents dans le dépôt (Gitleaks). `exit-code: "1"` rend le scan de vulnérabilités bloquant.
 
 ## Limites du pipeline GitHub
 
-Le pipeline **s'arrête après la publication**. Il ne lance ni `terraform apply`, ni `ansible-playbook`, ni `kubectl` : minikube tourne sur le poste local, injoignable depuis les runners GitHub. La suite du chemin est documentée dans [deploiement-local.md](deploiement-local.md).
+Le pipeline **s'arrête après le scan de sécurité** (qui suit la publication conditionnelle de l'image). Il ne lance ni `terraform apply`, ni `ansible-playbook`, ni `kubectl` : minikube tourne sur le poste local, injoignable depuis les runners GitHub. La suite du chemin est documentée dans [deploiement-local.md](deploiement-local.md).
+
+> Volontairement, ce pipeline n'ajoute pas de jobs `deploy-staging` / `deploy-production` (même sous forme de simples `echo` de démonstration) : le sujet impose explicitement que le pipeline GitHub s'arrête après contrôles, build, scan et publication. Le déploiement réel est déclenché **depuis le poste local**, jamais depuis GitHub Actions.
 
 ## Gestion des secrets
 

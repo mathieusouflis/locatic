@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -10,11 +10,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  build:
-    name: Build & verify
-    runs-on: ubuntu-latest
+permissions:
+  contents: read
+  packages: write
 
+jobs:
+  # Stage 1 : Tests
+  test:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -23,16 +26,63 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - uses: ./.github/actions/setup-tools
+
       - name: Restore dependencies
         run: dotnet restore
 
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
-      - name: Test
-        run: dotnet test --no-restore --configuration Release --logger "trx;LogFileName=test-results.trx"
+      - name: Run tests
+        run: |
+          set -o pipefail
+          dotnet test --no-restore --configuration Release \
+            --logger "trx;LogFileName=test-results.trx" 2>&1 | tee test-output.txt
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-output.txt
+            **/TestResults/*.trx
 
       - name: Check EF migrations are up to date
-        run: |
-          dotnet tool install --global dotnet-ef
-          dotnet ef migrations list --project app/locatic
+        run: dotnet ef migrations list --project app/locatic
+
+  # Stage 2 : Build image Docker (publication uniquement sur main)
+  build:
+    needs: test
+    uses: ./.github/workflows/reusable-docker.yml
+    with:
+      image-name: ghcr.io/${{ github.repository }}
+      context: ./app
+      push: ${{ github.ref == 'refs/heads/main' }}
+    secrets:
+      registry-username: ${{ github.actor }}
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+  # Stage 3 : Scan de sécurité
+  security:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Scan application files (Trivy)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: 'fs'
+          scan-ref: 'app/'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          format: 'table'
+
+      - name: Scan for leaked secrets (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+
+# Le pipeline s'arrête ici volontairement : minikube tourne sur le poste
+# local et les runners GitHub n'y ont pas accès. Le déploiement (Terraform
+# puis Ansible) est déclenché localement — voir docs/deploiement-local.md.

@@ -1,0 +1,24 @@
+name: 'Setup DevOps Tools'
+description: 'Install and verify the tooling used by the CI pipeline'
+
+inputs:
+  install-ef-tools:
+    description: 'Install the dotnet-ef global tool'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install dotnet-ef
+      if: inputs.install-ef-tools == 'true'
+      shell: bash
+      run: dotnet tool install --global dotnet-ef
+
+    - name: Verify tools
+      shell: bash
+      run: |
+        echo "--- Installed Tools ---"
+        dotnet --version
+        dotnet ef --version || echo "dotnet-ef not installed"
+        docker --version || echo "docker not installed"
