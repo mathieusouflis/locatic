@@ -152,13 +152,14 @@ deploy-staging:
   runs-on: ubuntu-latest
   environment: staging
   steps:
-    - name: Use secrets
+    - name: Show deployment configuration
       env:
-        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-        API_KEY: ${{ secrets.API_KEY }}
+        DB_PATH: /data/locatic.db
+        ASPNETCORE_ENVIRONMENT: Production
       run: |
-        echo "Secrets are masked in logs"
-        echo "DB_PASSWORD length: ${#DB_PASSWORD}"
+        echo "Image: ${{ needs.build-image.outputs.image-tag }}"
+        echo "DB_PATH=$DB_PATH"
+        echo "ASPNETCORE_ENVIRONMENT=$ASPNETCORE_ENVIRONMENT"
     - run: echo "Deploying to staging... (placeholder, pas de déploiement réel depuis GitHub)"
 
 deploy-production:
@@ -169,16 +170,19 @@ deploy-production:
     - run: echo "Deploying to production... (placeholder, pas de déploiement réel depuis GitHub)"
 ```
 
-Repris tels quels de la référence : deux jobs de démonstration qui illustrent l'usage des **GitHub Environments** et des secrets scopés par environnement (masqués dans les logs), sans exécuter aucune action réelle. **Ils ne déploient rien** : ni `kubectl`, ni `terraform`, ni `ansible` ne sont invoqués. Le sujet de ce mini-projet impose que le déploiement effectif (sur minikube) soit déclenché **depuis le poste local**, via Terraform puis Ansible — voir [deploiement-local.md](deploiement-local.md). Ces deux jobs restent donc volontairement inertes ; ne pas les confondre avec un vrai pipeline de déploiement continu.
+Adapté par rapport à la référence : celle-ci montre un `DB_PASSWORD`/`API_KEY` de démonstration (secrets scopés à l'environnement `staging`, masqués dans les logs), ce qui ne correspond à rien de réel ici — Locatic n'a ni base externe ni API tierce, donc aucun secret de déploiement à injecter. `deploy-staging` affiche à la place le tag d'image qui serait déployé (`needs.build-image.outputs.image-tag`) et les variables d'environnement réellement lues par l'application (`DB_PATH`, `ASPNETCORE_ENVIRONMENT` — voir [.env.example](../.env.example)). L'usage des **GitHub Environments** (`environment: staging` / `environment: production`) est conservé : c'est un mécanisme utile indépendamment du fait qu'il y ait ou non des secrets à scoper.
+
+**Ils ne déploient rien** : ni `kubectl`, ni `terraform`, ni `ansible` ne sont invoqués. Le sujet de ce mini-projet impose que le déploiement effectif (sur minikube) soit déclenché **depuis le poste local**, via Terraform puis Ansible — voir [deploiement-local.md](deploiement-local.md). Ces deux jobs restent donc volontairement inertes ; ne pas les confondre avec un vrai pipeline de déploiement continu.
 
 ## Gestion des secrets
 
 | Donnée | Où elle vit | Jamais dans Git |
 |--------|-------------|-----------------|
 | Auth registry (GHCR) | `GITHUB_TOKEN` automatique du workflow | token personnel |
-| `DB_PASSWORD` / `API_KEY` (démonstration `deploy-staging`) | secrets GitHub scopés à l'environnement `staging` | valeur en clair dans le YAML |
 | Variables locales sensibles | `*.tfvars`, `.env` (gitignorés) | `.env` réel |
 | État Terraform | local, gitignoré (`*.tfstate*`) | `terraform.tfstate` |
 | Secrets Kubernetes | templates versionnés, valeurs injectées au déploiement | Secret « réel » en clair |
+
+Locatic n'a, à ce jour, aucun secret de déploiement réel à gérer (pas de mot de passe de base de données, pas de clé d'API externe) : le seul secret manipulé par la CI est le `GITHUB_TOKEN` automatique, pour publier l'image sur GHCR.
 
 Le `.gitignore` du dépôt couvre déjà tous ces motifs. En cas de secret commité par erreur : le retirer **ne suffit pas** (il reste dans l'historique) — révoquer le secret immédiatement, puis purger l'historique (`git filter-repo`).
