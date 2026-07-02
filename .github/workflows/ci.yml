@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -15,10 +15,56 @@ permissions:
   packages: write
 
 jobs:
-  build:
-    name: Build & verify
+  # Stage 1 : Commitlint
+  commitlint:
+    name: Validate commit messages
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
+      - name: Check commit messages
+        uses: wagoid/commitlint-github-action@v6
+        with:
+          failOnWarnings: false
+          helpURL: https://www.conventionalcommits.org
+
+  # Stage 2 : Tests
+  test:
+    needs: commitlint
+    if: |
+      always() &&
+      (needs.commitlint.result == 'success' || needs.commitlint.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Run tests
+        run: |
+          set -o pipefail
+          dotnet test --configuration Release \
+            --logger "trx;LogFileName=test-results.trx" 2>&1 | tee test-output.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-output
+          path: test-output.txt
+
+  # Stage 3 : Build de l'application .NET
+  build-app:
+    needs: test
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -38,9 +84,9 @@ jobs:
           dotnet tool install --global dotnet-ef
           dotnet ef migrations list --project app/locatic
 
+  # Stage 4 : Build image Docker
   build-image:
-    name: Build Docker image
-    needs: build
+    needs: build-app
     uses: ./.github/workflows/reusable-docker.yml
     with:
       image-name: ghcr.io/${{ github.repository }}
@@ -49,3 +95,41 @@ jobs:
     secrets:
       registry-username: ${{ github.actor }}
       registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+  # Stage 5 : Scan de sécurité
+  security:
+    needs: build-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Scan application files
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: "fs"
+          scan-ref: "app/"
+          severity: "HIGH,CRITICAL"
+          exit-code: "1"
+          format: "table"
+
+  # Stage 6 : Deploy staging
+  deploy-staging:
+    needs: [build-image, security]
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Use secrets
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          echo "Secrets are masked in logs"
+          echo "DB_PASSWORD length: ${#DB_PASSWORD}"
+      - run: echo "Deploying to staging... (placeholder, pas de déploiement réel depuis GitHub)"
+
+  # Stage 7 : Deploy production
+  deploy-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: echo "Deploying to production... (placeholder, pas de déploiement réel depuis GitHub)"

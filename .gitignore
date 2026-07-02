@@ -37,6 +37,7 @@ htmlcov/
 .pytest_cache/
 TestResults/
 *.trx
+test-output.txt
 
 # ── IDE & OS ─────────────────────────────────────────────
 .DS_Store
