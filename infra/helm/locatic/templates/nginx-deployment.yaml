@@ -1,0 +1,45 @@
+{{- if .Values.nginx.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "locatic.fullname" . }}-nginx
+  labels:
+    {{- include "locatic.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "locatic.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: nginx
+  template:
+    metadata:
+      labels:
+        {{- include "locatic.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: nginx
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9113"
+    spec:
+      containers:
+        - name: nginx
+          image: "{{ .Values.nginx.image }}"
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: conf
+              mountPath: /etc/nginx/conf.d
+          readinessProbe:
+            tcpSocket:
+              port: 80
+        - name: nginx-exporter
+          image: "{{ .Values.nginx.exporterImage }}"
+          args:
+            - "--nginx.scrape-uri=http://127.0.0.1/stub_status"
+          ports:
+            - containerPort: 9113
+      volumes:
+        - name: conf
+          configMap:
+            name: {{ include "locatic.fullname" . }}-nginx-conf
+{{- end }}
