@@ -69,6 +69,7 @@ temp/
 .terraform.lock.hcl
 *.tfvars
 !*.tfvars.example
+tfplan
 crash.log
 
 # Ansible
