@@ -1,0 +1,4 @@
+kube_context         = "minikube"
+namespace            = "locatic"
+sqlite_storage       = "256Mi"
+sqlite_storage_class = "csi-hostpath-sc"
