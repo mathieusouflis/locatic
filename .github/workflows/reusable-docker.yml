@@ -15,7 +15,7 @@ on:
         type: string
         default: 'Dockerfile'
       push:
-        description: "Publier l'image dans la registry (déviation par rapport à la référence : notre pipeline doit publier sur main)"
+        description: "Publier l'image dans la registry"
         required: false
         type: boolean
         default: false
