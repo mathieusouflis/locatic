@@ -1,43 +1,40 @@
-# CI/CD — GitHub Actions, Pull Requests et registry
+# CI/CD (GitHub Actions, Pull Requests, registry)
 
-## Règles de branche
+## Protéger la branche main
 
-La branche `main` est protégée. Configuration attendue (Settings → Branches → *Add branch ruleset* ou *Branch protection rule* sur `main`) :
+Le sujet impose qu'on ne puisse pas pousser directement sur `main` : tout passe par une Pull Request. Configuré dans Settings > Branches :
 
-1. **Require a pull request before merging** — interdit les push directs ; tout changement passe par une PR.
-2. **Require status checks to pass before merging** — sélectionner les checks du workflow CI (au minimum `test`, `build-app`). Cocher *Require branches to be up to date* pour éviter de merger du code testé sur une base obsolète.
-3. **Require linear history** (recommandé) — merges en squash ou rebase, historique lisible.
-4. Ne pas cocher « Allow bypass » pour les admins si l'on veut prouver que la règle s'applique à tout le monde.
+1. **Require a pull request before merging** : bloque les push directs.
+2. **Require status checks to pass before merging** : checks `test` et `build-app` requis, avec *Require branches to be up to date* coché.
+3. **Require linear history** : merges en squash ou rebase.
+4. Pas de bypass pour les admins, sinon la règle ne sert à rien.
 
-> À faire une seule fois dans l'interface GitHub ; joindre une capture dans `docs/preuves/`.
+Capture dans `docs/preuves/`.
 
-## Workflow de travail
+## Le workflow suivi pour chaque changement
 
 ```bash
 git checkout -b feat/ma-modification
-# ... modifications ...
 git add . && git commit -m "feat: ma modification"
 git push origin feat/ma-modification
 gh pr create --fill
 ```
 
-La PR déclenche la CI ; le merge n'est possible que si les checks passent. La première PR du projet sert de démonstration du fonctionnement (capture dans `docs/preuves/`).
+La CI se déclenche automatiquement dès l'ouverture de la PR. Merge possible seulement si tous les checks passent.
 
-## Origine du pipeline
+## D'où vient la structure du pipeline
 
-Ce pipeline reprend, presque à l'identique, la structure du projet vu en cours (`CamillePaillou/devops-training`) : mêmes stages, même découpage en workflow réutilisable + action composite. Trois différences assumées et documentées ci-dessous : `commitlint` en première étape (convention déjà présente dans ce dépôt avant ce travail CI, absente de la référence), la publication réelle de l'image (la référence ne pousse jamais son image), et le job `test` scindé en `test` + `build-app` pour donner un check GitHub distinct à « les tests passent » et à « le projet compile » (la référence n'a pas cette distinction : `npm test` ne nécessite pas de compilation séparée).
+Je me suis inspiré du pipeline vu en cours (jobs, workflow réutilisable, action composite), adapté sur trois points : `commitlint` ajouté en première étape (un workflow séparé existait déjà dans le dépôt, je l'ai intégré à la chaîne) ; publication réelle de l'image sur `main` (demandée par le sujet) ; `test` et `build-app` séparés en deux jobs pour distinguer clairement échec de tests et échec de compilation.
 
-## Fichiers du pipeline
+## Les fichiers du pipeline
 
-- `.github/workflows/ci.yml` — l'orchestrateur ;
-- `.github/workflows/reusable-docker.yml` — workflow réutilisable (`workflow_call`) qui construit l'image ;
-- `.github/actions/setup-tools/action.yml` — action composite installant/vérifiant des outils DevOps (Terraform, Docker, kubectl). Comme dans la référence, elle n'est pour l'instant **appelée par aucun job** de `ci.yml` : elle est prête à être réutilisée par un futur workflow (ou en local) sans polluer le job de tests.
+- `.github/workflows/ci.yml` : orchestre tous les jobs
+- `.github/workflows/reusable-docker.yml` : workflow réutilisable (`workflow_call`) qui construit l'image Docker
+- `.github/actions/setup-tools/action.yml` : action composite qui installe/vérifie Terraform, Docker, kubectl (pas encore appelée par un job, gardée prête)
 
-Organisation, avec dépendances explicites (`needs:`) :
+Enchaînement des jobs (`needs:`) :
 
-```
-commitlint ──► test ──► build-app ──► build-image (reusable-docker.yml) ──► security ──► deploy-staging ──► deploy-production
-```
+commitlint, puis test, puis build-app, puis build-image (reusable-docker.yml), puis security, puis deploy-staging, puis deploy-production.
 
 ### 1. `commitlint`
 
@@ -54,7 +51,7 @@ commitlint:
         helpURL: https://www.conventionalcommits.org
 ```
 
-Reprend un workflow qui existait déjà séparément dans ce dépôt (`.github/workflows/commitlint.yml`, absent de la référence) et l'intègre comme première étape d'une seule chaîne au lieu d'un check indépendant. Il ne s'applique qu'aux PR (une plage de commits à valider). Sur un push direct vers `main`, le job est *skipped* — le `if:` de `test` traite `success` et `skipped` comme un feu vert, pour ne pas bloquer les pushes sur `main`.
+Ne tourne que sur les PR (il vérifie une plage de commits). Sur un push direct vers `main`, il est *skipped*, pas *failed* : le job `test` accepte donc `success` ou `skipped` comme feu vert.
 
 ### 2. `test`
 
@@ -80,11 +77,9 @@ test:
       with: { name: test-output, path: test-output.txt }
 ```
 
-La référence fait tourner ses tests Node sur une **matrice de versions** (`node-version: [18, 20, 22]`) parce qu'une lib npm doit rester compatible avec plusieurs runtimes Node en usage réel. Ce n'est pas le cas ici : le projet cible une seule version du SDK .NET (celle du `TargetFramework` du `.csproj`), donc pas de matrice — un seul job suffit. Le reste du pattern est identique : sortie de test capturée via `tee` puis uploadée comme artefact **même en cas d'échec** (`if: always()`), pour diagnostiquer un test cassé sans relancer le job.
+`actions/upload-artifact` a `if: always()` : les logs sont uploadés même si les tests échouent, pratique pour ne pas relancer tout le job. `dotnet test` compile le projet en interne, mais ce n'est pas la même chose que le job `build-app` suivant : deux causes d'échec différentes, deux checks séparés.
 
-`dotnet test` compile ce dont il a besoin en interne (impossible d'exécuter des tests sans compiler) ; ce n'est volontairement pas la même chose que le check « le projet applicatif compile » ci-dessous, qui a son propre nom de check dans l'UI GitHub.
-
-### 3. `build-app` — compilation du projet .NET
+### 3. `build-app`
 
 ```yaml
 build-app:
@@ -101,9 +96,9 @@ build-app:
         dotnet ef migrations list --project app/locatic
 ```
 
-Étape sans équivalent dans la référence (JavaScript n'a pas de phase de compilation à valider séparément). Elle donne un signal distinct de `test` dans l'UI GitHub : un build cassé et un test cassé sont deux causes d'échec différentes, autant les voir comme deux checks différents. La vérification des migrations EF (`dotnet ef migrations list`) vit ici : elle échoue si le modèle a changé sans migration générée, ce qui est un problème de « le projet est dans un état cohérent », pas un test à proprement parler.
+En plus du build, ce job vérifie que les migrations Entity Framework sont à jour. Si un modèle a changé sans migration générée, `dotnet ef migrations list` échoue et le signale dans la CI.
 
-### 4. `build-image` — image Docker via un workflow réutilisable
+### 4. `build-image`
 
 ```yaml
 build-image:
@@ -118,11 +113,11 @@ build-image:
     registry-password: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-`reusable-docker.yml` reprend le pattern de la référence (`docker/metadata-action` pour les tags, `docker/setup-buildx-action` + cache GitHub Actions `type=gha`) avec **une différence assumée** : la référence construit toujours avec `push: false` (elle ne publie jamais son image, y compris sur `main`). Le sujet de ce mini-projet exige au contraire une publication réelle sur la registry lors du merge sur `main` — le workflow réutilisable a donc été étendu avec une entrée `push` (booléenne, `false` par défaut) que `ci.yml` active uniquement quand `github.ref == 'refs/heads/main'`. Sur une PR, l'image est construite (le Dockerfile est validé, y compris son étage `test` — voir [docker.md](docker.md)) mais jamais publiée.
+Appelle `reusable-docker.yml`, qui utilise `docker/metadata-action` pour les tags et `docker/setup-buildx-action` avec le cache GitHub Actions (`type=gha`). `push` n'est activé que sur `main` : sur une PR l'image est construite (ce qui valide le Dockerfile, y compris son étage `test`, voir [docker.md](docker.md)) mais jamais publiée.
 
-Authentification : `registry-password: ${{ secrets.GITHUB_TOKEN }}` — le token éphémère du workflow, combiné à `permissions: packages: write` déclaré dans `ci.yml`, suffit pour GHCR : **aucun token personnel à créer ni à stocker**.
+Authentification via `secrets.GITHUB_TOKEN` (auto-généré, combiné à `permissions: packages: write` en haut de `ci.yml`) : aucun token personnel à créer.
 
-Vérifier la publication : onglet **Packages** du dépôt, ou `docker pull ghcr.io/<owner>/<repo>:<sha>`.
+Pour vérifier qu'une image est publiée : onglet **Packages** du dépôt, ou `docker pull ghcr.io/<owner>/<repo>:<sha>`.
 
 ### 5. `security`
 
@@ -142,7 +137,7 @@ security:
         format: 'table'
 ```
 
-Identique à la référence : scan **filesystem** (pas de l'image construite) sur `app/`, couvre les packages NuGet vulnérables via le fichier de restauration. `exit-code: "1"` rend le job bloquant.
+Trivy scanne le système de fichiers `app/` (pas l'image construite), ce qui couvre les packages NuGet vulnérables. `exit-code: "1"` rend le job bloquant.
 
 ### 6-7. `deploy-staging` / `deploy-production`
 
@@ -170,19 +165,17 @@ deploy-production:
     - run: echo "Deploying to production... (placeholder, pas de déploiement réel depuis GitHub)"
 ```
 
-Adapté par rapport à la référence : celle-ci montre un `DB_PASSWORD`/`API_KEY` de démonstration (secrets scopés à l'environnement `staging`, masqués dans les logs), ce qui ne correspond à rien de réel ici — Locatic n'a ni base externe ni API tierce, donc aucun secret de déploiement à injecter. `deploy-staging` affiche à la place le tag d'image qui serait déployé (`needs.build-image.outputs.image-tag`) et les variables d'environnement réellement lues par l'application (`DB_PATH`, `ASPNETCORE_ENVIRONMENT` — voir [.env.example](../.env.example)). L'usage des **GitHub Environments** (`environment: staging` / `environment: production`) est conservé : c'est un mécanisme utile indépendamment du fait qu'il y ait ou non des secrets à scoper.
-
-**Ils ne déploient rien** : ni `kubectl`, ni `terraform`, ni `ansible` ne sont invoqués. Le sujet de ce mini-projet impose que le déploiement effectif (sur minikube) soit déclenché **depuis le poste local**, via Terraform puis Ansible — voir [deploiement-local.md](deploiement-local.md). Ces deux jobs restent donc volontairement inertes ; ne pas les confondre avec un vrai pipeline de déploiement continu.
+Ces jobs ne font rien de réel, volontairement : le sujet impose que le déploiement (minikube) soit déclenché depuis mon poste, via Terraform puis Ansible, jamais depuis GitHub Actions (voir [deploiement-local.md](deploiement-local.md)). Ils servent à illustrer les **GitHub Environments**. Au départ ils affichaient un `DB_PASSWORD`/`API_KEY` de démo repris de l'exemple du cours ; ça ne correspondait à rien de réel pour Locatic (pas de base externe, pas d'API tierce), donc je les ai remplacés par le tag d'image et les vraies variables d'environnement de l'app (`DB_PATH`, `ASPNETCORE_ENVIRONMENT`, voir [.env.example](../.env.example)).
 
 ## Gestion des secrets
 
-| Donnée | Où elle vit | Jamais dans Git |
-|--------|-------------|-----------------|
-| Auth registry (GHCR) | `GITHUB_TOKEN` automatique du workflow | token personnel |
-| Variables locales sensibles | `*.tfvars`, `.env` (gitignorés) | `.env` réel |
-| État Terraform | local, gitignoré (`*.tfstate*`) | `terraform.tfstate` |
-| Secrets Kubernetes | templates versionnés, valeurs injectées au déploiement | Secret « réel » en clair |
+| Donnée | Où elle vit |
+|--------|-------------|
+| Auth registry (GHCR) | `GITHUB_TOKEN` automatique du workflow |
+| Variables locales sensibles | `*.tfvars`, `.env` (gitignorés) |
+| État Terraform | local, gitignoré (`*.tfstate*`) |
+| Secrets Kubernetes | templates versionnés, valeurs injectées au déploiement |
 
-Locatic n'a, à ce jour, aucun secret de déploiement réel à gérer (pas de mot de passe de base de données, pas de clé d'API externe) : le seul secret manipulé par la CI est le `GITHUB_TOKEN` automatique, pour publier l'image sur GHCR.
+Locatic n'a aucun vrai secret de déploiement à gérer (pas de mot de passe base de données, pas de clé d'API externe) : le seul secret manipulé par la CI est le `GITHUB_TOKEN` auto pour publier l'image.
 
-Le `.gitignore` du dépôt couvre déjà tous ces motifs. En cas de secret commité par erreur : le retirer **ne suffit pas** (il reste dans l'historique) — révoquer le secret immédiatement, puis purger l'historique (`git filter-repo`).
+Si un secret finissait par être commité par erreur : le retirer dans un commit suivant ne suffit pas, il reste dans l'historique. Il faut le révoquer puis purger l'historique (`git filter-repo`).

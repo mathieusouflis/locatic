@@ -5,13 +5,10 @@
 # Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # ── Default: all files ───────────────────────────────────
-# * @your-org/maintainers
+* @mathieusouflis
 
-# ── CI/CD and GitHub config ──────────────────────────────
-# .github/ @your-org/devops
+# ── Application code ─────────────────────────────────────
+/app/ @mathieusouflis
 
-# ── Documentation ────────────────────────────────────────
-# /docs/ @your-org/docs-team
-
-# ── Security-sensitive paths ─────────────────────────────
-# /src/auth/ @your-org/security-team
+# ── Infra (Terraform/Ansible/Helm) ───────────────────────
+/infra/ @mathieusouflis

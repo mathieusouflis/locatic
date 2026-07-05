@@ -35,12 +35,12 @@ body:
     attributes:
       label: Area
       options:
-        - Frontend / UI
-        - Backend / API
-        - Database
-        - Authentication
-        - Developer experience
-        - Documentation
+        - Application (.NET/MVC)
+        - Infra (Terraform/Ansible)
+        - CI/CD
+        - Kubernetes/Helm
+        - Monitoring
+        - Docs
         - Other
     validations:
       required: true
