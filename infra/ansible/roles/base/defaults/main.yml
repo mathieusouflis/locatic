@@ -1,0 +1,4 @@
+---
+# IfNotPresent = image locale
+# Allways force le pull d'une image publiée sur github
+app_image_pull_policy: IfNotPresent

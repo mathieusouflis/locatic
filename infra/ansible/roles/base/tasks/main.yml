@@ -1,0 +1,28 @@
+---
+- name: Lire les outputs Terraform
+  ansible.builtin.command: terraform output -json
+  args:
+    chdir: "{{ terraform_dir }}"
+  register: tf_out
+  changed_when: false
+
+- name: Extraire le namespace et le PVC SQLite
+  ansible.builtin.set_fact:
+    app_namespace: "{{ (tf_out.stdout | from_json).namespace.value }}"
+    sqlite_pvc: "{{ (tf_out.stdout | from_json).sqlite_pvc_name.value }}"
+
+- name: Déployer l'application
+  kubernetes.core.k8s:
+    state: present
+    context: "{{ kube_context }}"
+    namespace: "{{ app_namespace }}"
+    template: "{{ item }}"
+  loop:
+    - app-deployment.yaml.j2
+    - app-service.yaml.j2
+
+- name: Attendre que l'application soit prête
+  ansible.builtin.command: >
+    kubectl --context {{ kube_context }} rollout status
+    deployment/{{ app_name }} -n {{ app_namespace }} --timeout=120s
+  changed_when: false

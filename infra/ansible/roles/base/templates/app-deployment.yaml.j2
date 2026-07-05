@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ app_name }}
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+    managed-by: ansible
+spec:
+  replicas: {{ app_replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ app_port }}"
+        prometheus.io/path: /metrics
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1654
+        fsGroup: 1654
+      containers:
+        - name: {{ app_name }}
+          image: "{{ app_image }}:{{ app_tag }}"
+          imagePullPolicy: {{ app_image_pull_policy }}
+          ports:
+            - containerPort: {{ app_port }}
+          env:
+            - name: DB_PATH
+              value: /data/locatic.db
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+          volumeMounts:
+            - name: sqlite-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ app_port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ app_port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: sqlite-data
+          persistentVolumeClaim:
+            claimName: {{ sqlite_pvc }}

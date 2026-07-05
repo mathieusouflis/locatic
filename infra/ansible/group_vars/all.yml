@@ -1,0 +1,10 @@
+---
+terraform_dir: "{{ playbook_dir }}/../terraform"
+
+app_port: 8080
+
+# Ingress optionnel
+ingress_enabled: false
+ingress_class: nginx
+app_host: locatic.local)
+grafana_host: grafana.local)

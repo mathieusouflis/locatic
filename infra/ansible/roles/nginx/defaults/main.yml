@@ -1,0 +1,4 @@
+---
+nginx_image: nginx:1.27-alpine
+nginx_exporter_image: nginx/nginx-prometheus-exporter:1.4
+nginx_service_type: NodePort

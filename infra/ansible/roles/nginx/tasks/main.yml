@@ -1,0 +1,31 @@
+---
+- name: Déployer la configuration Nginx
+  kubernetes.core.k8s:
+    state: present
+    context: "{{ kube_context }}"
+    namespace: "{{ app_namespace }}"
+    template: nginx-configmap.yaml.j2
+  notify: reload nginx
+
+- name: Déployer Nginx
+  kubernetes.core.k8s:
+    state: present
+    context: "{{ kube_context }}"
+    namespace: "{{ app_namespace }}"
+    template: "{{ item }}"
+  loop:
+    - nginx-deployment.yaml.j2
+    - nginx-service.yaml.j2
+
+- name: Vérifier que Nginx est prêt
+  ansible.builtin.command: >
+    kubectl --context {{ kube_context }} rollout status
+    deployment/nginx -n {{ app_namespace }} --timeout=60s
+  changed_when: false
+
+- name: Exposer l'application via Ingress
+  kubernetes.core.k8s:
+    state: "{{ 'present' if ingress_enabled | bool else 'absent' }}"
+    context: "{{ kube_context }}"
+    namespace: "{{ app_namespace }}"
+    template: ingress.yaml.j2

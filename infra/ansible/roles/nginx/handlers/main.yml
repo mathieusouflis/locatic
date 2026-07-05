@@ -1,0 +1,6 @@
+---
+- name: reload nginx
+  ansible.builtin.command: >
+    kubectl --context {{ kube_context }} rollout restart
+    deployment/nginx -n {{ app_namespace }}
+  changed_when: true
