@@ -1,0 +1,129 @@
+---
+- name: Ajouter le repo Helm prometheus-community
+  kubernetes.core.helm_repository:
+    name: prometheus-community
+    repo_url: https://prometheus-community.github.io/helm-charts
+
+- name: Déployer la stack Prometheus + Grafana (kube-prometheus-stack)
+  kubernetes.core.helm:
+    name: monitoring
+    chart_ref: prometheus-community/kube-prometheus-stack
+    release_namespace: "{{ monitoring_namespace }}"
+    create_namespace: true
+    update_repo_cache: true
+    wait: true
+    values:
+      alertmanager:
+        config:
+          global:
+            resolve_timeout: 5m
+          route:
+            receiver: locatic-discord
+            group_by: ["alertname"]
+            group_wait: 30s
+            group_interval: 5m
+            repeat_interval: 4h
+            routes:
+              - receiver: locatic-discord
+                matchers:
+                  - severity="warning"
+          receivers:
+            - name: locatic-discord
+              discord_configs:
+                - webhook_url: "{{ alertmanager_discord_webhook }}"
+                  send_resolved: true
+      grafana:
+        adminPassword: "{{ grafana_admin_password }}"
+        ingress:
+          enabled: "{{ ingress_enabled | bool }}"
+          ingressClassName: "{{ ingress_class }}"
+          hosts:
+            - "{{ grafana_host }}"
+          path: /
+          pathType: Prefix
+      prometheus:
+        prometheusSpec:
+          additionalScrapeConfigs:
+            - job_name: locatic-pods
+              kubernetes_sd_configs:
+                - role: pod
+                  namespaces:
+                    names:
+                      - "{{ app_namespace }}"
+              relabel_configs:
+                - source_labels:
+                    [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+                  action: keep
+                  regex: "true"
+                - source_labels:
+                    [
+                      __address__,
+                      __meta_kubernetes_pod_annotation_prometheus_io_port,
+                    ]
+                  action: replace
+                  regex: ([^:]+)(?::\d+)?;(\d+)
+                  replacement: $1:$2
+                  target_label: __address__
+
+- name: Provisionner le dashboard Grafana Locatic
+  kubernetes.core.k8s:
+    state: present
+    context: "{{ kube_context }}"
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: locatic-dashboard
+        namespace: "{{ monitoring_namespace }}"
+        labels:
+          grafana_dashboard: "1"
+      data:
+        locatic-dashboard.json: "{{ lookup('file', role_path + '/files/locatic-dashboard.json') }}"
+
+- name: Déployer les règles d'alerte Prometheus pour Locatic
+  kubernetes.core.k8s:
+    state: present
+    context: "{{ kube_context }}"
+    definition:
+      apiVersion: monitoring.coreos.com/v1
+      kind: PrometheusRule
+      metadata:
+        name: locatic-alerts
+        namespace: "{{ monitoring_namespace }}"
+        labels:
+          release: monitoring
+      spec:
+        # btw i love cats ;)
+        groups:
+          - name: locatic
+            rules:
+              - alert: LocaticAppDown
+                expr: >-
+                  up{job="locatic-pods", instance=~".*:{{ app_port }}"} == 0
+                  or absent(up{job="locatic-pods", instance=~".*:{{ app_port }}"})
+                for: 2m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "L'application Locatic ne répond plus"
+                  description: "Aucune cible locatic-pods (port {{ app_port }}) n'est up depuis 2 minutes."
+              - alert: NginxDown
+                expr: >-
+                  up{job="locatic-pods", instance=~".*:9113"} == 0
+                  or absent(up{job="locatic-pods", instance=~".*:9113"})
+                for: 2m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "Nginx ne répond plus"
+                  description: "L'exporter nginx-prometheus-exporter (port 9113) n'est plus scrapé depuis 2 minutes."
+              - alert: SqlitePvcAlmostFull
+                expr: >-
+                  kubelet_volume_stats_used_bytes{persistentvolumeclaim="locatic-sqlite"}
+                  / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim="locatic-sqlite"} > 0.8
+                for: 5m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "Le volume SQLite est presque plein"
+                  description: "Plus de 80% du PVC locatic-sqlite est utilisé depuis 5 minutes."

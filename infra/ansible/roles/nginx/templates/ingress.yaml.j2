@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: locatic
+  namespace: {{ app_namespace }}
+  labels:
+    app: locatic
+    managed-by: ansible
+spec:
+  ingressClassName: {{ ingress_class }}
+  rules:
+    # L'app reste accessible uniquement via le Service nginx (reverse proxy)
+    - host: {{ app_host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nginx
+                port:
+                  number: 80

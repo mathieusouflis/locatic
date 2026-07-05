@@ -1,0 +1,12 @@
+---
+monitoring_namespace: monitoring
+
+# local seulement, override avec -e grafana_admin_password=<valeur>
+grafana_admin_password: admin
+
+# ---- NE PAS METTRE LE VRAI URL DNANS UN COMMIT ---- #
+#                                                     #
+# Webhook Discord pour les alertes override avec -e alertmanager_discord_webhook=<url>
+alertmanager_discord_webhook: "" #                    #
+#                                                     #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # #

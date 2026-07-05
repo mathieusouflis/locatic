@@ -1,0 +1,10 @@
+---
+- import_playbook: bootstrap-checks.yml
+
+- name: Déployer Locatic sur le cluster minikube local
+  hosts: local
+  gather_facts: false
+  roles:
+    - base
+    - nginx
+    - monitoring

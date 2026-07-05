@@ -1,0 +1,16 @@
+---
+- name: Vérifier les prérequis locaux
+  hosts: local
+  gather_facts: false
+
+  tasks:
+    - name: Vérifier que kubectl est installé
+      ansible.builtin.command: kubectl version --client
+      register: kubectl_check
+      changed_when: false
+
+    - name: Vérifier que minikube est démarré
+      ansible.builtin.command: minikube status --format={{ '{{' }}.Host{{ '}}' }}
+      register: minikube_check
+      changed_when: false
+      failed_when: "'Running' not in minikube_check.stdout"
