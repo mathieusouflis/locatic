@@ -60,7 +60,7 @@ jobs:
           username: ${{ secrets.registry-username }}
           password: ${{ secrets.registry-password }}
 
-      - uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v7
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.context }}/${{ inputs.dockerfile }}
