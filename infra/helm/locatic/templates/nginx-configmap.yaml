@@ -1,0 +1,28 @@
+{{- if .Values.nginx.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "locatic.fullname" . }}-nginx-conf
+  labels:
+    {{- include "locatic.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx
+data:
+  default.conf: |
+    server {
+      listen 80;
+
+      location /stub_status {
+        stub_status;
+        allow 127.0.0.1;
+        deny all;
+      }
+
+      location / {
+        proxy_pass http://{{ include "locatic.fullname" . }}-svc:{{ .Values.service.port }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      }
+    }
+{{- end }}

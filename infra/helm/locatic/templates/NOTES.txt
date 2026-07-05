@@ -1,0 +1,11 @@
+Locatic installé.
+
+Point d'entrée (Nginx) :
+{{- if .Values.nginx.enabled }}
+  minikube service {{ include "locatic.fullname" . }}-nginx -n {{ .Release.Namespace }} --url
+{{- else }}
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "locatic.fullname" . }}-svc 18080:{{ .Values.service.port }}
+{{- end }}
+
+Vérification :
+  curl <url-au-dessus>/health

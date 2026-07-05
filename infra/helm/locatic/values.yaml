@@ -1,0 +1,48 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/mathieusouflis/locatic
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+config:
+  aspnetcoreEnvironment: Production
+  appPort: 8080
+
+sqlite:
+  existingClaim: locatic-sqlite
+  dbPath: /data/locatic.db
+
+nginx:
+  enabled: true
+  image: nginx:1.27-alpine
+  exporterImage: nginx/nginx-prometheus-exporter:1.4
+  serviceType: NodePort
+
+# Ingress optionnel
+ingress:
+  enabled: false
+  className: nginx
+  host: locatic.local
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+probes:
+  readiness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  liveness:
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 15
