@@ -4,9 +4,9 @@
 
 Before opening an issue, please check these resources:
 
-1. **[Documentation](../docs/getting-started/README.md)** — setup guide and common commands
-2. **[FAQ](../docs/developer-guide/faq.md)** — answers to frequent questions
-3. **[Existing issues](../../issues)** — your problem may already be tracked
+1. **[README](../README.md)** and the **[docs/ folder](../docs)** for setup guides
+2. **[Local deployment guide](../docs/deploiement-local.md)** and **[operations guide](../docs/exploitation.md)**
+3. **[Existing issues](../../issues)** - your problem may already be tracked
 
 ## Asking a question
 

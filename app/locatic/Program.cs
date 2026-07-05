@@ -2,6 +2,7 @@ using Locatic.Data;
 using Locatic.Data.Context;
 using Locatic.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,9 +49,11 @@ if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != "true")
 
 app.UseStaticFiles();
 app.UseRouting();
+app.UseHttpMetrics();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
+app.MapMetrics();
 
 app.MapControllerRoute(
     name: "default",

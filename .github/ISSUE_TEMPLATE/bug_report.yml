@@ -48,12 +48,12 @@ body:
     attributes:
       label: Area
       options:
-        - Frontend / UI
-        - Backend / API
-        - Database
-        - Authentication
+        - Application (.NET/MVC)
+        - Infra (Terraform/Ansible)
         - CI/CD
-        - Documentation
+        - Kubernetes/Helm
+        - Monitoring
+        - Docs
         - Other
     validations:
       required: true
@@ -65,9 +65,8 @@ body:
       description: Your runtime versions.
       placeholder: |
         - OS: macOS 15 / Ubuntu 24.04 / Windows 11
-        - Node: 22.x
-        - pnpm: 10.x
-        - Browser (if applicable): Chrome 134
+        - .NET SDK version: 8.0.x
+        - minikube/kubectl version: minikube 1.33 / kubectl 1.30
     validations:
       required: true
 
